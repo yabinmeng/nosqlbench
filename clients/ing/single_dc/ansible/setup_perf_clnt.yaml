@@ -1,0 +1,62 @@
+- hosts: cluster_clnt
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    python_verion: 3.9.0
+  roles:
+    - { role: inst_python3 }
+
+- hosts: cluster_clnt
+  gather_facts: false
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  vars:
+    python_verion: 3.9.0
+    openjdk_ver: 11
+  roles:
+    - { role: inst_openjdk }
+  tasks:
+    - name: Create a folder to host Pulsar perf benchmark script
+      file:
+        path: "/home/{{ ansible_ssh_user }}/performance_testing/ppfb"
+        state: directory
+        recurse: yes
+        mode: '0755'
+        owner: "{{ ansible_ssh_user }}"
+        group: "{{ ansible_ssh_user }}"
+  
+    - name: Download Pulsar perf benchmark script
+      get_url:
+        url: "https://raw.githubusercontent.com/yabinmeng/pulsar_perf_bench/master/{{ item }}"
+        dest: /home/{{ ansible_ssh_user }}/performance_testing/ppfb
+        mode: '0666'
+        owner: "{{ ansible_ssh_user }}"
+        group: "{{ ansible_ssh_user }}"
+      with_items:
+        - "pperf_bench.py"
+        - "ppfb.yaml"
+
+    - name: Create a folder to host NoSQLBench script
+      file:
+        path: "/home/{{ ansible_ssh_user }}/performance_testing/nosqlbench"
+        state: directory
+        recurse: yes
+        mode: '0755'
+        owner: "{{ ansible_ssh_user }}"
+        group: "{{ ansible_ssh_user }}"
+
+    - name: Download NoSQLBench script
+      get_url:
+        url: "https://github.com/nosqlbench/nosqlbench/releases/download/nosqlbench-4.15.39/nb"
+        dest: /home/{{ ansible_ssh_user }}/performance_testing/nosqlbench
+        mode: '0777'
+        owner: "{{ ansible_ssh_user }}"
+        group: "{{ ansible_ssh_user }}"  
+
+    - name: Install "screen" command 
+      become: true
+      become_method: sudo
+      apt:
+        name: screen
+        update_cache: true

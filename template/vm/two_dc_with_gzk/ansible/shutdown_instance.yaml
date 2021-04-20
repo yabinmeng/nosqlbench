@@ -1,0 +1,97 @@
+---
+# Stop brokers (ClusterA and ClusterB)
+- hosts: cluster_srv
+  gather_facts: true
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles:
+    - { role: stop_svc_broker, when: srv_type == "broker" }
+
+# Stop bookies (ClusterA and ClusterB)
+- hosts: cluster_srv
+  gather_facts: true
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles:
+    - { role: stop_svc_bookie, when: srv_type == "bookie" }
+
+# Stop zookeepers (ClusterA and ClusterB)
+- hosts: cluster_srv
+  gather_facts: true
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles:
+    - { role: stop_svc_zookeeper, when: srv_type == "zk" }
+
+
+# Stop global zookeepers
+- hosts: global_zk
+  gather_facts: true
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles:
+    - { role: stop_svc_zookeeper_global }
+
+
+# Clean up bookie data directories, zookeeper data directories, and old logs
+- hosts: cluster_srv
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  tasks:
+  - name: If requested, clean-up bookie data and logs
+    shell: rm -rf {{ bookie_storage_mnt_paths }}/*
+    args:
+      warn: no
+    when: srv_type == "bookie" and del_inst is defined and del_inst|bool
+
+  - name: If requested, clean-up zookeeper data and logs
+    shell: rm -rf {{ zk_data_dir }}/version*
+    args:
+      warn: no
+    when: srv_type == "zk" and del_inst is defined and del_inst|bool
+
+  - name: If requested, clean-up pulsar logs
+    shell: rm -rf {{ tgt_pulsar_inst_dir }}/logs/*
+    args:
+      warn: no
+    when: del_inst is defined and del_inst|bool
+
+# Clean up global zookeeper data
+- hosts: global_zk
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  tasks:
+  - name: If requested, clean-up zookeeper data and logs
+    shell: rm -rf {{ item }}
+    args:
+      warn: no
+    with_items:
+      - "{{ gzk_data_dir }}/version*"
+    when: del_inst is defined and del_inst|bool
+
+# Delete Pulsar binaries if requested
+- hosts: pulsar
+  gather_facts: false
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  tasks:
+  - name: Delete installation directory if requested
+    file:
+      path: "{{ item }}"
+      state: absent
+    with_items:
+      - "{{ tgt_pulsar_inst_dir }}"
+      # - "{{ tgt_pkg_dir }}"
+    when:
+      del_inst is defined and del_inst|bool

@@ -1,0 +1,23 @@
+---
+- name: Check if zookeeper server is already running
+  stat:
+    path: "{{ tgt_pulsar_inst_dir }}/bin/pulsar-configuration-store.pid"
+  register: stat_result
+  
+- name: Stop zookeeper server if it is running
+  shell: "{{ tgt_pulsar_inst_dir }}/bin/pulsar-daemon stop configuration-store"
+  when: stat_result.stat.exists
+
+- name: Wait until zookeeper listeneing port {{ gzk_clnt_port }} is gone
+  wait_for:
+    host: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+    port: "{{ gzk_clnt_port }}"
+    state: stopped
+    delay: 2
+    timeout: 120
+
+- name: Delete zookeeper process ID file
+  file:
+    path: "{{ tgt_pulsar_inst_dir }}/bin/pulsar-configuration-store.pid"
+    state: absent
+  when: stat_result.stat.exists

@@ -1,0 +1,93 @@
+---
+# ClusterA
+- name: (ClusterA) Template to get the nubmer of broker nodes
+  template: src=broker_node_cnt_clusterA.j2 dest=/tmp/broker_node_cnt_clusterA mode=0664
+
+- name: (ClusterA) Load tempoarary broker node count file
+  shell: cat /tmp/broker_node_cnt_clusterA
+  register: broker_node_cnt_cmdcat_clusterA
+
+- name: (ClusterA) Set broker node count into a variable
+  set_fact: 
+    broker_node_cnt_clusterA={{ broker_node_cnt_cmdcat_clusterA.stdout}}
+- debug: msg="{{ broker_node_cnt_clusterA }}"
+  when: show_debug_msg|bool
+
+- name: (ClusterA) Set ensemble size, write, and ack quorum count
+  set_fact:
+    ensemble_size: "{% if broker_node_cnt_clusterA | int > 1 %}2{% else %}1{% endif %}"
+    write_quorum_cnt: "{% if broker_node_cnt_clusterA | int > 1 %}2{% else %}1{% endif %}"
+    ack_quorum_cnt: "{% if broker_node_cnt_clusterA | int > 1 %}2{% else %}1{% endif %}"
+  when: cluster_name=="ClusterA"  
+
+# ClusterB
+- name: (ClusterB) Template to get the nubmer of broker nodes
+  template: src=broker_node_cnt_clusterB.j2 dest=/tmp/broker_node_cnt_clusterB mode=0664
+
+- name: (ClusterB) Load tempoarary broker node count file
+  shell: cat /tmp/broker_node_cnt_clusterB
+  register: broker_node_cnt_cmdcat_clusterB
+
+- name: (ClusterB) Set broker node count into a variable
+  set_fact: 
+    broker_node_cnt_clusterB={{ broker_node_cnt_cmdcat_clusterB.stdout}}
+- debug: msg="{{ broker_node_cnt_clusterB }}"
+  when: show_debug_msg|bool
+
+- name: (ClusterB) Set ensemble size, write, and ack quorum count
+  set_fact:
+    ensemble_size: "{% if broker_node_cnt_clusterB | int > 1 %}2{% else %}1{% endif %}"
+    write_quorum_cnt: "{% if broker_node_cnt_clusterB | int > 1 %}2{% else %}1{% endif %}"
+    ack_quorum_cnt: "{% if broker_node_cnt_clusterB | int > 1 %}2{% else %}1{% endif %}"
+  when: cluster_name=="ClusterB"
+
+
+## Common settings that are applicable to both ClusterA and ClusterB
+- name: Modify Pulsar broker config file - {{ pbroker_conf_file }}
+  lineinfile:
+    path: "{{ pbroker_conf_file }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^configurationStoreServers=', line: "configurationStoreServers={{ hostvars[groups['cluster_srv'][0]]['zk_list_str_global'] }}" }
+    - { regexp: '^clusterName=', line: 'clusterName={{ cluster_name }}' }
+    - { regexp: '^brokerServicePort=', line: 'brokerServicePort={{ broker_svc_port }}' }
+    - { regexp: '^webServicePort=', line: 'webServicePort={{ web_svc_port }}' }
+    - { regexp: '^brokerServicePortTls=', line: 'brokerServicePortTls={{ broker_svc_port_tls }}' }
+    - { regexp: '^webServicePortTls=', line: 'webServicePortTls={{ web_svc_port_tls }}' }
+    - { regexp: '^managedLedgerDefaultEnsembleSize=', line: 'managedLedgerDefaultEnsembleSize={{ ensemble_size }}'}
+    - { regexp: '^managedLedgerDefaultWriteQuorum=', line: 'managedLedgerDefaultWriteQuorum={{ write_quorum_cnt }}' }
+    - { regexp: '^managedLedgerDefaultAckQuorum=', line: 'managedLedgerDefaultAckQuorum={{ write_quorum_cnt }}' }
+    # - { regexp: '^functionsWorkerEnabled=', line: 'functionsWorkerEnabled={{ enable_broker_function }}'}
+
+
+## Cluster specific settings, pointing to each cluster's own Zookeeper servers
+- name: (ClusterA) Modify Pulsar broker config file - {{ pbroker_conf_file }}
+  lineinfile:
+    path: "{{ pbroker_conf_file }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^zookeeperServers=', line: "zookeeperServers={{ hostvars[groups['cluster_srv'][0]]['zk_list_str_clusterA'] }}" }
+  when: cluster_name=="ClusterA"  
+
+- name: (ClusterB) Modify Pulsar broker config file - {{ pbroker_conf_file }}
+  lineinfile:
+    path: "{{ pbroker_conf_file }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^zookeeperServers=', line: "zookeeperServers={{ hostvars[groups['cluster_srv'][0]]['zk_list_str_clusterB'] }}" }
+  when: cluster_name=="ClusterB"   
+
+
+# Modify function worker yaml file
+- name: Modify Pulsar broker function worker yaml file (functions_worker.yml), when function is enabled
+  lineinfile:
+    path: "{{ pbroker_func_worker_file }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - { regexp: '^pulsarFunctionsCluster:', line: 'pulsarFunctionsCluster: {{ cluster_name }}' }
+  when:
+    - enable_broker_function | bool

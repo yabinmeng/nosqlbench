@@ -1,0 +1,45 @@
+---
+##
+# Get a string for all pulsar borker nodes with web service listening ports, e.g.
+#   <broker_node_1>:6550,<broker_node_2>:6550,<broker_node_3>:6550
+- name: Get "web-service-url" (IP:Port) list (No DNS)
+  set_fact:
+    web_service_url_str_temp: "{% for node in groups['cluster_srv'] %}{%if hostvars[node].srv_type=='broker' %}{{ hostvars[node].private_ip }}:{{ web_svc_port }},{% endif %}{% endfor %}"
+- name: Remove trailing "," character    
+  set_fact:
+    web_service_url_str: "{{ web_service_url_str_temp | regex_replace(',$','') }}"     
+- debug: msg="web_service_url_str - {{ web_service_url_str }}"
+  when: show_debug_msg|bool
+
+##
+# Get a string for all pulsar borker nodes with web service TLS listening ports, e.g.
+#   <broker_node_1>:6551,<broker_node_2>:6551,<broker_node_3>:6551
+- name: Get "web-service-url-tls" (IP:Port) list (No DNS)
+  set_fact:
+    web_service_url_tls_str_temp: "{% for node in groups['cluster_srv'] %}{%if hostvars[node].srv_type=='broker' %}{{ hostvars[node].private_ip }}:{{ web_svc_port_tls }},{% endif %}{% endfor %}"
+- name: Remove trailing "," character    
+  set_fact:
+    web_service_url_tls_str: "{{ web_service_url_tls_str_temp | regex_replace(',$','') }}"     
+- debug: msg="web_service_url_tls_str - {{ web_service_url_tls_str }}"
+  when: show_debug_msg|bool
+
+##
+# Get a string for all pulsar borker nodes with broker service listening ports, e.g.
+#   <broker_node_1>:8080,<broker_node_2>:8080,<broker_node_3>:8080
+- name: Get "broker-service-url" (IP:Port) list (No DNS)
+  set_fact:
+    broker_service_url_str_temp: "{% for node in groups['cluster_srv'] %}{%if hostvars[node].srv_type=='broker' %}{{ hostvars[node].private_ip }}:{{ broker_svc_port }},{% endif %}{% endfor %}"
+- name: Remove trailing "," character    
+  set_fact:
+    broker_service_url_str: "{{ broker_service_url_str_temp | regex_replace(',$','') }}"     
+- debug: msg="broker_service_url_str - {{ broker_service_url_str }}"
+  when: show_debug_msg|bool
+
+##
+# Get a string for all pulsar borker nodes with broker service TLS listening ports, e.g.
+#   <broker_node_1>:8443,<broker_node_2>:8443,<broker_node_3>:8443
+- name: Get "broker-service-url-tls" (IP:Port) list (No DNS)
+  set_fact:
+    broker_service_url_tls_str: "{% for node in groups['cluster_srv'] %}{%if hostvars[node].srv_type=='broker' %}{{ hostvars[node].private_ip }}:{{ broker_svc_port_tls }},{% endif %}{% endfor %}"
+- debug: msg="broker_service_url_tls_str - {{ broker_service_url_tls_str }}"
+  when: show_debug_msg|bool

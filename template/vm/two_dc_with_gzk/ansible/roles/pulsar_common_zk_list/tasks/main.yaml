@@ -1,0 +1,87 @@
+###
+# This is used for a Pulsar instance deployment with 2 Clusters: ClusterA and ClusterB
+###
+---
+##
+# Get Zookeeper node list in main zookeeper configuration file, e.g.
+#   <zookeeper_node_1>:2888:3888
+#   <zookeeper_node_2>:2888:3888
+#   <zookeeper_node_3>:2888:3888
+
+# == ClusterA ==
+- name: (ClusterA) Get zookeeper configuration (IP:Port:Port) list (No DNS) into a temporary file "/tmp/zkcfg_list_clusterA"
+  template: src=zklist_clusterA.j2 dest=/tmp/zkcfg_list_clusterA mode=0664
+
+- name: (ClusterA) Load tempoarary "zkcfg_list_clusterA" file
+  shell: cat /tmp/zkcfg_list_clusterA
+  register: zkcfg_list_clusterA_cmdcat
+
+- name: (ClusterA) Set "zookeeper" configuration (IP:Port:Port) list into a variable
+  set_fact: 
+    zknode_cfg_list_clusterA={{ zkcfg_list_clusterA_cmdcat.stdout }}
+- debug: msg="zknode_cfg_list_clusterA - {{ zknode_cfg_list_clusterA }}"
+  when: show_debug_msg|bool 
+
+##
+# Get a string for all zookeeper nodes with listening ports, e.g.
+#   <zookeeper_node_1>:2181,<zookeeper_node_2>:2181,<zookeeper_node_3>:2181
+- name: (ClusterA) Get "zookeeper" (IP:Port) list (No DNS)
+  set_fact:
+    zk_list_str_clusterATemp: "{% for node in groups['cluster_srv_A'] %}{%if hostvars[node].srv_type=='zk' %}{{ hostvars[node].private_ip }}:{{ zk_clnt_port }},{% endif %}{% endfor %}"
+- name: Remove trailing "," character
+  set_fact:
+    zk_list_str_clusterA: "{{ zk_list_str_clusterATemp | regex_replace(',$','') }}"
+- debug: msg="zk_list_str_clusterA - {{ zk_list_str_clusterA }}"
+  when: show_debug_msg|bool
+
+
+
+# === ClusterB ===
+- name: (ClusterB) Get zookeeper configuration (IP:Port:Port) list (No DNS) into a temporary file "/tmp/zkcfg_list_clusterB"
+  template: src=zklist_clusterB.j2 dest=/tmp/zkcfg_list_clusterB mode=0664
+
+- name: (ClusterB) Load tempoarary "zkcfg_list_clusterB" file
+  shell: cat /tmp/zkcfg_list_clusterB
+  register: zkcfg_list_clusterB_cmdcat
+
+- name: (ClusterB) Set "zookeeper" configuration (IP:Port:Port) list into a variable
+  set_fact: 
+    zknode_cfg_list_clusterB={{ zkcfg_list_clusterB_cmdcat.stdout }}
+- debug: msg="zknode_cfg_list_clusterB - {{ zknode_cfg_list_clusterB }}"
+  when: show_debug_msg|bool 
+
+- name: (ClusterB) Get "zookeeper" (IP:Port) list (No DNS)
+  set_fact:
+    zk_list_str_clusterBTemp: "{% for node in groups['cluster_srv_B'] %}{%if hostvars[node].srv_type=='zk' %}{{ hostvars[node].private_ip }}:{{ zk_clnt_port }},{% endif %}{% endfor %}"
+- name: Remove trailing "," character
+  set_fact:
+    zk_list_str_clusterB: "{{ zk_list_str_clusterBTemp | regex_replace(',$','') }}"    
+- debug: msg="zk_list_str_clusterB - {{ zk_list_str_clusterB }}"
+  when: show_debug_msg|bool
+
+
+# == Global ZK ==
+- name: (GlobalZK) Get zookeeper configuration (IP:Port:Port) list (No DNS) into a temporary file "/tmp/zkcfg_list_global"
+  template: src=zklist_global.j2 dest=/tmp/zkcfg_list_global mode=0664
+
+- name: (GlobalZK) Load tempoarary "zkcfg_list_global" file
+  shell: cat /tmp/zkcfg_list_global
+  register: zkcfg_list_global_cmdcat
+
+- name: (GlobalZK) Set "zookeeper" configuration (IP:Port:Port) list into a variable
+  set_fact: 
+    zknode_cfg_list_global={{ zkcfg_list_global_cmdcat.stdout }}
+- debug: msg="zknode_cfg_list_global - {{ zknode_cfg_list_global }}"
+  when: show_debug_msg|bool 
+
+##
+# Get a string for all zookeeper nodes with listening ports, e.g.
+#   <zookeeper_node_1>:2184,<zookeeper_node_2>:2184,<zookeeper_node_3>:2184
+- name: Get "zookeeper" (IP:Port) list (No DNS)
+  set_fact:
+    zk_list_str_globalTemp: "{% for node in groups['global_zk'] %}{{ hostvars[node].private_ip }}:{{ gzk_clnt_port }},{% endfor %}"
+- name: Remove trailing "," character
+  set_fact:
+    zk_list_str_global: "{{ zk_list_str_globalTemp | regex_replace(',$','') }}"     
+- debug: msg="zk_list_str_global - {{ zk_list_str_global }}"
+  when: show_debug_msg|bool

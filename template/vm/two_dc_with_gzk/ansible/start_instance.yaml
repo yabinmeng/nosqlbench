@@ -1,0 +1,56 @@
+###
+# this is the playbook that is used to start a pulsar instance that has 2 clusters
+###
+---
+# Start global zookeeper servers, one by one
+- hosts: global_zk
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_zookeeper_global_mc }
+
+# Start Zookeeper servers, one by one
+- hosts: pulsar_server
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_zookeeper, when: zookeeper|bool }
+
+# # Initialzie cluster metadata (for ClusterA) after Zookeeper is up
+# - hosts: pulsar_server
+#   any_errors_fatal: true
+#   become: true
+#   become_method: sudo
+#   roles: 
+#     - { role: init_cluster_metadata_mc, when: init_metadata is defined and init_metadata|bool } 
+
+# Start Bookkeeper nodes, one by one
+- hosts: pulsar_server
+  any_errors_fatal: false
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_bookie, when: bookie|bool }
+
+# Test whether bookie functions properly after they're up and running
+- hosts: pulsar_server
+  any_errors_fatal: false
+  become: true
+  become_method: sudo
+  run_once: true
+  roles:
+    - { role: bookie_sanity_check }
+
+# Start Pulsar broker nodes, one by one
+- hosts: pulsar_server
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_broker, when: broker|bool }

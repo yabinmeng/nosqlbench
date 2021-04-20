@@ -1,0 +1,26 @@
+---
+- name: Check if zookeeper server is already running
+  stat:
+    path: "{{ tgt_pulsar_inst_dir }}/bin/pulsar-configuration-store.pid"
+  register: stat_result
+
+- name: Start global zookeeper server (with default JVM setting), if it is not running yet
+  become: true
+  become_method: sudo
+  become_user: "{{ pulsar_user }}"
+  shell: "PULSAR_EXTRA_OPTS=\"-Dstats_server_port={{ gzk_stats_port }}\" {{ tgt_pulsar_inst_dir }}/bin/pulsar-daemon start configuration-store"
+  when: not stat_result.stat.exists and (customize_jvm is not defined or not customize_jvm|bool) 
+
+- name: Start global zookeeper server (with customized JVM setting), if it is not running yet
+  become: true
+  become_method: sudo
+  become_user: "{{ pulsar_user }}"
+  shell: "PULSAR_MEM=\"{{ pulsar_mem_gzk }}\" PULSAR_EXTRA_OPTS=\"-Dstats_server_port={{ gzk_stats_port }}\" {{ tgt_pulsar_inst_dir }}/bin/pulsar-daemon start configuration-store"
+  when: not stat_result.stat.exists and (customize_jvm is defined and customize_jvm|bool) 
+
+- name: Wait until zookeeper listeneing port {{ gzk_clnt_port }} is ready
+  wait_for:
+    host: "{{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+    port: "{{ gzk_clnt_port }}"
+    delay: 2
+    timeout: 120

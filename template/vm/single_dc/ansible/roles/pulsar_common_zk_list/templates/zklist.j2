@@ -1,0 +1,8 @@
+{% set zklist = [] %}
+{% for node in groups['cluster_srv'] %}
+{# {% set ignored = zklist.append(node + ':2888:3888') %} #}
+{% if hostvars[node].srv_type=='zk' %}
+{% set ignored = zklist.append(hostvars[node].private_ip + ':2888:3888') %}
+{% endif %}
+{% endfor %}
+{{ zklist }}

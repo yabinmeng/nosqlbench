@@ -1,0 +1,143 @@
+###
+# this is the playbook that is used to set up a pulsar instance having 2 clusters and a global ZK
+###
+---
+# Download and install Pulsar binaries on all Pulsar server hosts and client hosts
+- hosts: pulsar
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  roles: 
+    - { role: openjdk_inst }
+    - { role: inst_pulsar_bin, when: inst_pulsar_bin is not defined or inst_pulsar_bin|bool}
+
+- hosts: all
+  gather_facts: true
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  run_once: true
+  roles: 
+    - { role: pulsar_common_zk_list }
+    - { role: pulsar_common_broker_list }
+
+# Make configuration changes for Global zookeepers
+- hosts: global_zk
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  roles: 
+    # Mount dedicated storage space to Pulsar bookkeeper
+    - { role: mnt_gzk_storage }
+    - { role: config_zookeeper_global }
+
+# Start global zookeeper servers, one by one
+- hosts: global_zk
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_zookeeper_global }
+
+# Make necessary configuration changes for Pulsar bookies and brokers
+- hosts: cluster_srv
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  roles: 
+    # Mount dedicated storage space to Pulsar bookkeeper
+    - { role: mnt_zk_storage, when: srv_type == "zk" }
+    # Mount dedicated storage space to Pulsar bookkeeper
+    - { role: mnt_bookie_storage, when: srv_type == "bookie" }
+    # Config zookeepers for ClusterA
+    - { role: config_zookeeper, when: srv_type == "zk" }
+    # Config bookies for ClusterA
+    - { role: config_bookkeeper, when: srv_type == "bookie" }
+    # Config brokers for ClusterA
+    - { role: config_pulsar_broker, when: srv_type == "broker" }
+
+# Start Zookeeper servers, one by one
+- hosts: cluster_srv
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_zookeeper, when: srv_type == "zk" }
+
+# Initialzie cluster metadata (for ClusterA) after Zookeeper is up
+- hosts: cluster_srv_A
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  run_once: true
+  roles: 
+    - { role: init_cluster_metadata } 
+
+# Initialzie cluster metadata (for ClusterB) after Zookeeper is up
+- hosts: cluster_srv_B
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  run_once: true
+  roles: 
+    - { role: init_cluster_metadata } 
+
+# Start Bookkeeper nodes, one by one
+- hosts: cluster_srv
+  any_errors_fatal: false
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_bookie, when: srv_type == "bookie" }
+
+# Test whether bookie functions properly (for ClusterA) after they're up and running
+- hosts: cluster_srv_A
+  any_errors_fatal: false
+  become: true
+  become_method: sudo
+  run_once: true
+  roles:
+    - { role: bookie_sanity_check }
+
+# Test whether bookie functions properly (for ClusterA) after they're up and running
+- hosts: cluster_srv_B
+  any_errors_fatal: false
+  become: true
+  become_method: sudo
+  run_once: true
+  roles:
+    - { role: bookie_sanity_check }
+
+# Start Pulsar broker nodes, one by one
+- hosts: cluster_srv
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_broker, when: srv_type == "broker" }
+
+# Configure Pulsar client in cluster
+- hosts: pulsar:!global_zk
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  roles: 
+    - { role: config_pulsar_client }
+
+# Update .profile for all hosts in cluster
+- hosts: pulsar:!global_zk
+  any_errors_fatal: true
+  tasks:
+  - name: update profile
+    lineinfile:
+      dest: ~/.profile
+      state: present
+      line: "{{ item }}"
+    with_items:
+      - export CLUSTER_NAME={{ cluster_name }}
+      - export PULSAR_HOME=/opt/pulsar
+      - export PATH="$PULSAR_HOME/bin:$PATH"

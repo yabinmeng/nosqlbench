@@ -1,0 +1,24 @@
+---
+- hosts: pm_and_metrics
+  gather_facts: false
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  roles:
+    - { role: inst_openjdk }
+    - { role: inst_config_pulsar_mgr_bin }
+    - { role: start_svc_pulsar_mgr }
+    - { role: pulsar_mgr_admin_user }
+
+- hosts: pm_and_metrics
+  gather_facts: true
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  collections:
+    # for docker and docker-compose
+    - community.general
+  roles:
+    - { role: docker_runtime }
+    - { role: config_prom_grafana }
+    - { role: start_svc_prom_graf }

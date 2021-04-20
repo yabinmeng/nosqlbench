@@ -1,0 +1,102 @@
+---
+# Download and install Pulsar binaries on all Pulsar server hosts and client hosts
+- hosts: pulsar
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  roles: 
+    - { role: inst_openjdk }
+    - { role: inst_pulsar_bin, when: inst_pulsar_bin is not defined or inst_pulsar_bin|bool}
+
+- hosts: all
+  gather_facts: true
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  run_once: true
+  roles: 
+    - { role: pulsar_common_zk_list }
+    - { role: pulsar_common_broker_list }
+
+# Make necessary configuration changes for Pulsar bookies and brokers
+- hosts: cluster_srv
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  roles: 
+    # Mount dedicated storage space to Pulsar bookkeeper
+    - { role: mnt_zk_storage, when: srv_type == "zk" }
+    # Mount dedicated storage space to Pulsar bookkeeper
+    - { role: mnt_bookie_storage, when: srv_type == "bookie" }
+    # Config zookeepers
+    - { role: config_zookeeper, when: srv_type == "zk" }
+    # Config bookies
+    - { role: config_bookkeeper, when: srv_type == "bookie" }
+    # Config brokers
+    - { role: config_pulsar_broker, when: srv_type == "broker" }
+
+# Start Zookeeper servers, one by one
+- hosts: cluster_srv
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_zookeeper, when: srv_type == "zk" }
+
+# Initialzie cluster metadata after Zookeeper is up
+- hosts: cluster_srv
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  run_once: true
+  roles: 
+    - { role: init_cluster_metadata } 
+
+# Start Bookkeeper nodes, one by one
+- hosts: cluster_srv
+  any_errors_fatal: false
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_bookie, when: srv_type == "bookie" }
+
+# Test whether bookie functions properly after they're up and running
+- hosts: cluster_srv
+  any_errors_fatal: false
+  become: true
+  become_method: sudo
+  run_once: true
+  roles:
+    - { role: bookie_sanity_check }
+
+# Start Pulsar broker nodes, one by one
+- hosts: cluster_srv
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_broker, when: srv_type == "broker" }
+
+# Configure Pulsar client in cluster
+- hosts: pulsar
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  roles: 
+    - { role: config_pulsar_client }
+
+# Update .profile for all hosts in cluster
+- hosts: pulsar
+  any_errors_fatal: true
+  tasks:
+  - name: update profile
+    lineinfile:
+      dest: ~/.profile
+      state: present
+      line: "{{ item }}"
+    with_items:
+      - export PULSAR_HOME=/opt/pulsar
+      - export PATH="$PULSAR_HOME/bin:$PATH"

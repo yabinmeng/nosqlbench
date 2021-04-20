@@ -1,0 +1,36 @@
+---
+# Start Zookeeper servers, one by one
+- hosts: cluster_srv
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_zookeeper, when: srv_type == "zk"}
+
+# Start Bookkeeper nodes, one by one
+- hosts: cluster_srv
+  any_errors_fatal: false
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_bookie, when: srv_type == "bookie" }
+
+# Test whether bookie functions properly after they're up and running
+- hosts: cluster_srv
+  any_errors_fatal: false
+  become: true
+  become_method: sudo
+  run_once: true
+  roles:
+    - { role: bookie_sanity_check }
+
+# Start Pulsar broker nodes, one by one
+- hosts: cluster_srv
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  serial: 1
+  roles: 
+    - { role: start_svc_broker, when: srv_type == "broker" }

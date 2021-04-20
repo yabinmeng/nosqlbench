@@ -1,0 +1,6 @@
+{% set zklist = [] %}
+{% for node in groups['global_zk'] %}
+{# {% set ignored = zklist.append(node + ':2888:3888') %} #}
+{% set ignored = zklist.append(hostvars[node].private_ip + ':2185:2186') %}
+{% endfor %}
+{{ zklist }}

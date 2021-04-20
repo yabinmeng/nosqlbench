@@ -1,0 +1,86 @@
+---
+- name: Add a system user and group - "{{ pulsar_user }}:{{ pulsar_user }}"
+  user: 
+    name: "{{ pulsar_user }}"
+    create_home: false
+    system: yes
+    state: present
+
+- name: Add "{{ ansible_ssh_user }}" into group "{{ pulsar_user }}" 
+  user:
+    name: "{{ ansible_ssh_user }}"
+    groups: "{{ pulsar_user }}"
+    append: yes
+
+- name: Create relevant folders
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ pulsar_user }}"
+    group: "{{ pulsar_user }}"
+    recurse: yes
+  with_items:
+    - "{{ tgt_pkg_dir }}"
+    - "{{ tgt_pulsar_inst_dir }}/logs"
+    - "{{ tgt_pulsar_inst_dir }}/connectors"
+    - "{{ tgt_pulsar_inst_dir }}/offloaders"
+
+- name: Check if OSS Pulsar distro already exists on remote host
+  stat:
+    path: "{{ tgt_pkg_dir }}/apache-pulsar-{{ pulsar_ver }}-bin.tar.gz"
+  register: oss_distro_stat
+- debug: msg={{ oss_distro_stat.stat }}
+  when: show_debug_msg|bool
+
+- name: Download pulsar version if it isn't already downloaded
+  get_url:
+    url: "{{ pulsar_bin_download_url }}"
+    dest: "{{ tgt_pkg_dir }}/apache-pulsar-{{ pulsar_ver }}-bin.tar.gz"
+    owner: "{{ pulsar_user }}"
+    group: "{{ pulsar_user }}"
+  when: not oss_distro_stat.stat.exists
+
+- name: Extract downloaded Pulsar binary archive
+  unarchive:
+    src: "{{ tgt_pkg_dir }}/apache-pulsar-{{ pulsar_ver }}-bin.tar.gz"
+    remote_src: yes
+    dest: "{{ tgt_pulsar_inst_dir }}"
+    extra_opts: [--strip-components=1]
+    owner: "{{ pulsar_user }}"
+    group: "{{ pulsar_user }}"
+
+- name: Download Pulsar built-in I/O Connectors, if needed
+  get_url:
+    url: "{{ pulsar_connector_download_url_base }}/pulsar-io-{{ item }}-{{ pulsar_ver }}.nar"
+    dest: "{{ tgt_pulsar_inst_dir }}/connectors/pulsar-io-{{ item }}-{{ pulsar_ver }}.nar"
+    owner: "{{ pulsar_user }}"
+    group: "{{ pulsar_user }}"
+  with_items:
+    - "{{ pulsar_connectors }}"
+  when: builtin_connector|bool
+
+- name: Download Pulsar TieredStorage Offloaders, if needed
+  get_url:
+    url: "{{ pulsar_ts_offloader_bin_download_url }}"
+    dest: "{{ tgt_pkg_dir }}/apache-pulsar-offloaders-{{ pulsar_ver }}-bin.tar.gz"
+    owner: "{{ pulsar_user }}"
+    group: "{{ pulsar_user }}"
+  when: tierstorage_offloader | bool
+
+- name: Extract downloaded Pulsar TieredStorage Offloader archive file.
+  unarchive:
+    src: "{{ tgt_pkg_dir }}/apache-pulsar-offloaders-{{ pulsar_ver }}-bin.tar.gz"
+    remote_src: yes
+    dest: "{{ tgt_pulsar_inst_dir }}/offloaders"
+    extra_opts: [--strip-components=2]
+    owner: "{{ pulsar_user }}"    
+    group: "{{ pulsar_user }}"
+  when: tierstorage_offloader | bool
+
+- name: Fix ownership and permissions on the extract directory and sub-directories
+  file:
+    path: "{{ tgt_pulsar_inst_dir }}"
+    owner: "{{ pulsar_user }}"    
+    group: "{{ pulsar_user }}"
+    mode: 0775
+    recurse: yes

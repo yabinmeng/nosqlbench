@@ -1,0 +1,9 @@
+[
+  {
+    "targets": [ 
+      <GRAPHITE_NODE_IP_PORT_ARRAY>
+    ],
+    "labels": { 
+    }
+  }
+]

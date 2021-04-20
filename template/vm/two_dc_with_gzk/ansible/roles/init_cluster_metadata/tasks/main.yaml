@@ -1,0 +1,30 @@
+---
+- name: (ClusterA) Initalize cluster metadata
+  become: true
+  become_method: sudo
+  become_user: "{{ pulsar_user }}"
+  shell: |
+    {{ tgt_pulsar_inst_dir }}/bin/pulsar initialize-cluster-metadata \
+    --cluster {{ cluster_name }} \
+    --zookeeper {{ zk_list_str_clusterA }} \
+    --configuration-store {{ zk_list_str_global }} \
+    --web-service-url http://{{ web_service_url_str_clusterA }} \
+    --broker-service-url pulsar://{{ broker_service_url_str_clusterA }} \
+    --web-service-url-tls https://{{ web_service_url_tls_str_clusterA }} \
+    --broker-service-url-tls pulsar+ssl://{{ broker_service_url_tls_str_clusterA }}
+  when: cluster_name=="ClusterA"
+
+- name: (ClusterB) Initalize cluster metadata
+  become: true
+  become_method: sudo
+  become_user: "{{ pulsar_user }}"
+  shell: |
+    {{ tgt_pulsar_inst_dir }}/bin/pulsar initialize-cluster-metadata \
+    --cluster {{ cluster_name }} \
+    --zookeeper {{ zk_list_str_clusterB }} \
+    --configuration-store {{ zk_list_str_global }} \
+    --web-service-url http://{{ web_service_url_str_clusterB }} \
+    --broker-service-url pulsar://{{ broker_service_url_str_clusterB }} \
+    --web-service-url-tls https://{{ web_service_url_tls_str_clusterB }} \
+    --broker-service-url-tls pulsar+ssl://{{ broker_service_url_tls_str_clusterB }}
+  when: cluster_name=="ClusterB"  

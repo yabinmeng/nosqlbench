@@ -1,0 +1,7 @@
+{% set metrics_list = [] %}
+{% for node in groups['cluster_srv'] %}
+{% if hostvars[node].srv_type=='broker' %}
+{% set ignored = metrics_list.append(hostvars[node].private_ip + ':' + web_svc_port|string) %}
+{% endif %}
+{% endfor %}
+{{ metrics_list | join(', ') }}

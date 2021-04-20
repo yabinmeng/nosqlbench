@@ -1,0 +1,88 @@
+---
+- hosts: pulsar
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  tasks:
+  - name: Create security (sub)folders
+    file:
+      path: "{{ pulsar_security_file_homedir }}/{{ item }}"
+      state: directory
+      recurse: yes
+      owner: "{{ pulsar_user }}"
+      group: "{{ pulsar_user }}"
+    with_items:
+      - key
+      - token
+
+- hosts: pulsar_server
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  tasks:
+  - name: Update broker.conf to enable AuthN and AuthR
+    lineinfile:
+      path: "{{ pbroker_conf_file }}"
+      regexp: "{{ item.regexp }}"
+      line: "{{ item.line }}"
+    with_items:
+      - { regexp: '^authenticationEnabled=', line: "authenticationEnabled=true" }
+      - { regexp: '^authenticationProviders=', line: "authenticationProviders=org.apache.pulsar.broker.authentication.AuthenticationProviderToken" }
+      - { regexp: '^brokerClientAuthenticationPlugin=', line: "brokerClientAuthenticationPlugin=org.apache.pulsar.client.impl.auth.AuthenticationToken" }
+      - { regexp: '^brokerClientAuthenticationParameters=', line: "brokerClientAuthenticationParameters =file:///opt/pulsar/security/token/cluster-admin.jwt" }
+      - { regexp: '^authorizationEnabled=', line: "authorizationEnabled=true" }
+      - { regexp: '^authorizationProvider=', line: 'authorizationProvider=org.apache.pulsar.broker.authorization.PulsarAuthorizationProvider' }
+      - { regexp: '^superUserRoles=', line: "superUserRoles={{ super_user_role_names }}" }
+      - { regexp: '^tokenPublicKey=', line: "tokenPublicKey=file://{{ pulsar_security_file_homedir }}/key/{{ token_asym_public_key_name }}" }
+    when: broker|bool
+
+- hosts: pulsar_client
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  tasks:
+  - name: Update client.conf with AuthN and AuthR enabled
+    lineinfile:
+      path: "{{ pulsar_client_config_file }}"
+      regexp: "{{ item.regexp }}"
+      line: "{{ item.line }}"
+    with_items:
+      - { regexp: '^authPlugin=', line: "authPlugin=org.apache.pulsar.client.impl.auth.AuthenticationToken" }
+      - { regexp: '^authParams=', line: "authParams=file://{{ pulsar_security_file_homedir }}/token/{{ super_user_role_names }}.jwt" }
+
+- hosts: pulsar_server
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  vars:
+    local_folder: /Users/yabinmeng/MyFolder/Yabin.Work/Datastax/PSA.Vanguard/West.Union.PoC/pulsar_deploy_aws/oss_distro/security
+  tasks:
+  - name: Copy necessary security files from local to Pulsar servers 
+    copy:
+      src: "{{ local_folder }}/{{ item }}"
+      dest: "{{ pulsar_security_file_homedir }}/{{ item }}"
+      owner: "{{ pulsar_user }}"
+      group: "{{ pulsar_user }}"
+    with_items:
+      - "token/{{ super_user_role_names }}.jwt"
+      - "key/{{ token_asym_public_key_name }}"
+
+- hosts: pulsar_client
+  any_errors_fatal: true
+  become: true
+  become_method: sudo
+  vars:
+    local_folder: /Users/yabinmeng/MyFolder/Yabin.Work/Datastax/PSA.Vanguard/West.Union.PoC/pulsar_deploy_aws/oss_distro/security
+  tasks:
+  - name: Copy relevant security tokens from Pulsar clients 
+    copy:
+      src: "{{ local_folder }}/{{ item }}"
+      dest: "{{ pulsar_security_file_homedir }}/{{ item }}"
+      owner: "{{ pulsar_user }}"
+      group: "{{ pulsar_user }}"
+    with_items:
+      - "token/{{ super_user_role_names }}.jwt"
+      - "token/tenant-admin.jwt"
+      - "token/reguser_a.jwt"
+      - "token/reguser_p.jwt"
+      - "token/reguser_c.jwt"
